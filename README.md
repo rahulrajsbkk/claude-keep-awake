@@ -1,32 +1,53 @@
-# claude-keep-awake
+<div align="center">
 
-Keep your Mac awake while Claude is doing work — automatically, in the background, forever.
+# ☕ claude-keep-awake
 
-A tiny macOS LaunchAgent that watches for any of:
+### Keep your Mac wide awake while Claude is working.
 
-- **Claude Code VS Code extension** running tasks
-- **Claude Code CLI** (`claude` from the Homebrew cask)
-- **Claude desktop app**
+[![Platform: macOS](https://img.shields.io/badge/Platform-macOS-000000?logo=apple&logoColor=white)](https://www.apple.com/macos/)
+[![Made with: Bash](https://img.shields.io/badge/Made%20with-Bash-4EAA25?logo=gnubash&logoColor=white)](https://www.gnu.org/software/bash/)
+[![Powered by: caffeinate](https://img.shields.io/badge/Powered%20by-caffeinate-6F4E37)](x-man-page://caffeinate)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Maintenance: active](https://img.shields.io/badge/Maintained-yes-brightgreen.svg)](#-author)
 
-…and holds a system idle-sleep assertion (via `caffeinate -i`) while any of them are running. When they all exit, the assertion is released and your Mac can sleep normally.
+<sub>A tiny macOS LaunchAgent that holds <code>caffeinate -i</code> whenever Claude Code (VS Code extension <em>or</em> CLI) or the Claude desktop app is running. When they all exit, your Mac is free to sleep again.</sub>
 
-No more "I left it running overnight and the machine slept."
+</div>
 
-## How it works
+---
 
-A small bash watcher (`caffeinated-claude.sh`) polls every 30 seconds for matching processes. While at least one is running, it spawns `caffeinate -i` as a child process. When none are running, it kills the child. A LaunchAgent (`com.user.caffeinated-claude`) starts the watcher at every login and respawns it if it crashes (`KeepAlive`).
+## 🎯 Why?
 
-Only `caffeinate -i` is used — the display can still sleep, only the system is kept awake. (Change to `-di` in the script if you want the display held on too.)
+> "I left it running overnight and the machine slept."
 
-## Install
+Sound familiar? `caffeinate -i <command>` works if you launch Claude Code from a shell you control — but it breaks the moment you use the VS Code extension, the desktop app, or anything launched outside your terminal. This watcher solves it from the *outside*: it polls the process table and holds the assertion as long as **anything** Claude is alive.
 
-### One-line install (recommended)
+---
+
+## ✨ What it watches
+
+| | Process | Matched by |
+|---|---|---|
+| 🟣 | **Claude Code — VS Code extension** | `anthropic.claude-code-*` |
+| 🟢 | **Claude Code — CLI (Homebrew)** | `Caskroom/claude-code/*`, `/opt/homebrew/bin/claude`, `/usr/local/bin/claude` |
+| 🔵 | **Claude desktop app** | `/Applications/Claude.app/*` |
+
+While **any** of these is running → `caffeinate -i` is held.
+When **all** of them exit → assertion released; macOS can sleep normally.
+
+> The display can still sleep — only the *system* is held. Want the screen kept on too? Flip `-i` to `-di` in the watcher script.
+
+---
+
+## 🚀 Install
+
+### One-line install ✨ (recommended)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/rahulrajsbkk/claude-keep-awake/main/setup.sh | bash
 ```
 
-That clones the repo to `~/.local/share/claude-keep-awake` and runs `install.sh`. Re-run the same command any time to update.
+That clones to `~/.local/share/claude-keep-awake` and runs `install.sh`. Re-run any time to update.
 
 ### From a local clone
 
@@ -36,23 +57,23 @@ cd claude-keep-awake
 ./install.sh
 ```
 
-Either path copies:
+### What gets installed
 
-| File | Destination |
-|---|---|
-| `bin/caffeinated-claude.sh` | `~/bin/caffeinated-claude.sh` |
-| `bin/caffeinated-claude-ctl` | `~/bin/caffeinated-claude-ctl` |
-| `LaunchAgents/com.user.caffeinated-claude.plist` | `~/Library/LaunchAgents/com.user.caffeinated-claude.plist` (with `$HOME` substituted) |
+| From | → | To |
+|---|---|---|
+| `bin/caffeinated-claude.sh`   | → | `~/bin/caffeinated-claude.sh` |
+| `bin/caffeinated-claude-ctl`  | → | `~/bin/caffeinated-claude-ctl` |
+| `LaunchAgents/com.user.caffeinated-claude.plist` | → | `~/Library/LaunchAgents/com.user.caffeinated-claude.plist` (with `$HOME` substituted) |
 
-…and loads the LaunchAgent. It will now start at every login.
+…then the LaunchAgent is loaded with `launchctl load -w`. **It will start at every login. No further action required.**
 
-Make sure `~/bin` is on your `$PATH` so you can call `caffeinated-claude-ctl` directly.
+Add `~/bin` to your `$PATH` to call `caffeinated-claude-ctl` directly.
 
-## Usage
+---
 
-After install, you don't need to do anything — it just works.
+## 🎮 Usage
 
-To inspect or control it:
+After install you don't need to do anything — it just works.
 
 ```bash
 caffeinated-claude-ctl status     # is it running? is an assertion held right now?
@@ -63,69 +84,92 @@ caffeinated-claude-ctl start      # re-enable
 caffeinated-claude-ctl restart    # after editing the script
 ```
 
-Logs live at:
+### Logs
 
 - `~/Library/Logs/caffeinated-claude.log` — watcher's own log
 - `~/Library/Logs/caffeinated-claude.out.log` / `.err.log` — LaunchAgent stdout/stderr
 
-## Verifying it works
+### ✅ Verify it's working
 
-With Claude Code (VS Code or CLI) or Claude.app running:
+With Claude Code (VS Code or CLI) or `Claude.app` open:
 
 ```bash
 caffeinated-claude-ctl status
-```
-
-You should see the watcher process plus a `caffeinate -i` line. You can also confirm the assertion at the OS level:
-
-```bash
 pmset -g assertions | grep -i preventuseridlesystemsleep
 ```
 
-## Configuration
+You should see the watcher process, the `caffeinate -i` child, and a `PreventUserIdleSystemSleep` assertion held by the OS.
 
-Both knobs are environment variables, overridable in the LaunchAgent plist:
+---
+
+## ⚙️ Configuration
+
+Both knobs are environment variables — set them in the LaunchAgent plist:
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `CAFFEINATED_CLAUDE_INTERVAL` | `30` | Seconds between checks. |
-| `CAFFEINATED_CLAUDE_PATTERN` | `anthropic\.claude-code-\|Caskroom/claude-code/\|/opt/homebrew/bin/claude\|/usr/local/bin/claude\|/Applications/Claude\.app/` | `pgrep -f` regex of processes that should hold the system awake. |
+| `CAFFEINATED_CLAUDE_INTERVAL` | `30` | Seconds between checks |
+| `CAFFEINATED_CLAUDE_PATTERN`  | `anthropic\.claude-code-\|Caskroom/claude-code/\|/opt/homebrew/bin/claude\|/usr/local/bin/claude\|/Applications/Claude\.app/` | `pgrep -f` regex for processes that should hold the system awake |
 
-To pass them to the LaunchAgent, add an `EnvironmentVariables` dict to `~/Library/LaunchAgents/com.user.caffeinated-claude.plist` and `caffeinated-claude-ctl restart`.
+To pass them to the LaunchAgent, add an `EnvironmentVariables` dict to `~/Library/LaunchAgents/com.user.caffeinated-claude.plist`, then `caffeinated-claude-ctl restart`.
 
-### Holding the display on too
+### 🖥️ Want the display held on too?
 
-Edit `~/bin/caffeinated-claude.sh` and change `caffeinate -i` to `caffeinate -di`, then `caffeinated-claude-ctl restart`.
+Edit `~/bin/caffeinated-claude.sh` — change `caffeinate -i` to `caffeinate -di` — then `caffeinated-claude-ctl restart`.
 
-### Adding more process patterns
+### ➕ Watch more processes
 
-Want to also keep the system awake while (say) `ollama` is running? Override `CAFFEINATED_CLAUDE_PATTERN` to include `|/ollama( |$)`.
+Want to also keep awake while (say) `ollama` is running? Override `CAFFEINATED_CLAUDE_PATTERN` to include `|/ollama( |$)`.
 
-## Uninstall
+---
+
+## 🧠 How it works
+
+A small bash script polls every 30s for matching processes:
+
+```
+┌──────────────────────────────────┐
+│  com.user.caffeinated-claude     │  ← LaunchAgent (RunAtLoad + KeepAlive)
+│  └─ caffeinated-claude.sh        │  ← watcher loop, 30s tick
+│       └─ caffeinate -i           │  ← spawned only while Claude is running
+└──────────────────────────────────┘
+```
+
+- Watcher crashes? → `KeepAlive` respawns it.
+- You reboot? → `RunAtLoad` starts it at login.
+- No Claude running? → `caffeinate` child is killed, Mac sleeps normally.
+
+---
+
+## 🧹 Uninstall
 
 ```bash
 ./uninstall.sh
 ```
 
-Removes the LaunchAgent and the two scripts in `~/bin`. Logs are left in place.
+Removes the LaunchAgent and the two scripts in `~/bin`. Logs are left in place (you can delete `~/Library/Logs/caffeinated-claude*.log` if you want a clean wipe).
 
-## Why not `caffeinate -i <command>`?
+---
 
-That works if you launch Claude Code from a shell you control. It does **not** work when:
-
-- Claude Code runs inside VS Code (you don't launch it yourself).
-- The Claude desktop app is launched from the Dock.
-- You want a single source of truth that always knows when *anything* Claude-related is running.
-
-This repo solves that by watching the process table from the outside.
-
-## Requirements
+## 📋 Requirements
 
 - macOS (uses `launchctl`, `caffeinate`, `pgrep`)
 - Bash (ships with macOS)
 
-Tested on Apple Silicon / macOS 14+. Paths for Intel Macs (`/usr/local/bin/claude`) are also matched by the default pattern.
+Tested on Apple Silicon, macOS 14+. Intel paths (`/usr/local/bin/claude`) are also matched by the default pattern.
 
-## License
+---
 
-MIT — see [LICENSE](LICENSE).
+## 📜 License
+
+[MIT](LICENSE)
+
+---
+
+## 👤 Author
+
+**Rahul Raj** — [@rahulrajsbkk](https://github.com/rahulrajsbkk)
+
+> _"A cup of coffee commits one to forty years of friendship."_ — Turkish proverb ☕
+
+<sub>Built because too many Claude Code sessions died to macOS idle sleep. If this saved you some grief, a ⭐ on the repo is appreciated.</sub>
