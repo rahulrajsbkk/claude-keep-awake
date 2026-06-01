@@ -1,0 +1,43 @@
+#!/bin/bash
+# claude-keep-awake control script.
+# Usage: caffeinated-claude-ctl {start|stop|restart|status|log|tail}
+
+set -u
+
+LABEL="com.user.caffeinated-claude"
+PLIST="${HOME}/Library/LaunchAgents/${LABEL}.plist"
+LOG="${HOME}/Library/Logs/caffeinated-claude.log"
+
+cmd="${1:-status}"
+
+case "$cmd" in
+  start)
+    launchctl load -w "$PLIST" && echo "loaded: $LABEL"
+    ;;
+  stop)
+    launchctl unload -w "$PLIST" && echo "unloaded: $LABEL"
+    ;;
+  restart)
+    launchctl unload -w "$PLIST" 2>/dev/null
+    launchctl load -w "$PLIST" && echo "restarted: $LABEL"
+    ;;
+  status)
+    if launchctl list | grep -q "$LABEL"; then
+      launchctl list | grep "$LABEL"
+      pgrep -fl caffeinated-claude.sh || echo "(watcher process not visible)"
+      pgrep -fl 'caffeinate -i' || echo "(no caffeinate assertion currently held)"
+    else
+      echo "not loaded"
+    fi
+    ;;
+  log)
+    [[ -f "$LOG" ]] && cat "$LOG" || echo "no log yet at $LOG"
+    ;;
+  tail)
+    [[ -f "$LOG" ]] && tail -f "$LOG" || { echo "no log yet at $LOG"; exit 1; }
+    ;;
+  *)
+    echo "usage: $(basename "$0") {start|stop|restart|status|log|tail}" >&2
+    exit 2
+    ;;
+esac
