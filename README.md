@@ -173,3 +173,11 @@ Tested on Apple Silicon, macOS 14+. Intel paths (`/usr/local/bin/claude`) are al
 > _"A cup of coffee commits one to forty years of friendship."_ — Turkish proverb ☕
 
 <sub>Built because too many Claude Code sessions died to macOS idle sleep. If this saved you some grief, a ⭐ on the repo is appreciated.</sub>
+
+---
+
+<div align="center">
+
+Made with ❤️ by **Rahul Raj** ([@rahulrajsbkk](https://github.com/rahulrajsbkk))
+
+</div>
